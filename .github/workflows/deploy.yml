@@ -20,7 +20,7 @@ jobs:
           LEETIFY_URL: ${{ secrets.LEETIFY_URL }}
           LLM_URL: ${{ secrets.LLM_URL }}
           WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
-          STATE_FILE: "/home/runner/coach/state.json"
+          STATE_FILE: "/app/state.json"
 
         run: |
           docker pull ghcr.io/whitezom7/leetify-ai-coach:latest
