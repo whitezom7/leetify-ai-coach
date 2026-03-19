@@ -1,0 +1,34 @@
+name: CS2 Coach Deployment
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+jobs:
+  check-matches:
+    runs-on: self-hosted
+    environment: prod
+
+    steps:
+      - name: Log into GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Pull and Run
+        env:
+          STEAM_ID: ${{ secrets.STEAM_ID }}
+          LEETIFY_URL: ${{ secrets.LEETIFY_URL }}
+          LLM_URL: ${{ secrets.LLM_URL }}
+          WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+          STATE_FILE: "/home/user/coach/state.json"
+
+        run: |
+          docker pull ghcr.io/whitezom7/leetify-ai-coach:latest
+          docker run --rm \
+            -e steam_id="$STEAM_ID" \
+            -e leetify_url="$LEETIFY_URL" \
+            -e llm_url="$LLM_URL" \
+            -e webhook_url="$WEBHOOK_URL" \
+            -e state_file="$STATE_FILE" \
+            -v /home/user/coach/state.json:/app/state.json \
+            ghcr.io/whitezom7/leetify-ai-coach:latest
