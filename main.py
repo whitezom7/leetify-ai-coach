@@ -7,12 +7,12 @@ from datetime import datetime
 
 env = os.environ.get
 
-steam_id = env("STEAM_ID")
-base_url = env("LEETIFY_URL")
+steam_id = env("steam_id")
+base_url = env("leetify_url")
 leetify_url = f"{base_url}{steam_id}"
-llm_url = env("LLM_URL")
-state_file = env("STATE_FILE")
-webhook_url = env("WEBHOOK_URL")
+llm_url = env("llm_url")
+state_file = env("state_file")
+webhook_url = env("webhook_url")
 
 if not os.path.exists("logs"):
     os.makedirs("logs")
