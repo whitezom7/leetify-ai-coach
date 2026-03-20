@@ -1,3 +1,5 @@
+import sys
+
 import requests
 import os
 import json
@@ -73,7 +75,7 @@ def get_latest_match():
             time.sleep(2 ** attempt)
 
     log.error("Failed to get latest match after retries.")
-    return None
+    sys.exit(1)
 
 
 def send_data_to_ai(latest_match):
@@ -116,7 +118,7 @@ def send_data_to_ai(latest_match):
             log.error(f"Critical Error: {e}")
             time.sleep(2 ** attempt)
     log.error("Critical Error")
-    return "System Failure"
+    sys.exit(1)
 
 
 def send_webhook(advice, match_time, match_result):
@@ -151,6 +153,7 @@ def send_webhook(advice, match_time, match_result):
             log.error(f"Webhook Error: {e}")
             time.sleep(2 ** attempt)
     log.error("All webhook retry attempts failed.")
+    sys.exit(1)
 
 
 
