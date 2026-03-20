@@ -2,16 +2,29 @@ import requests
 import os
 import json
 import time
+import logging as log
 from datetime import datetime
 
 env = os.environ.get
 
-steam_id = env("steam_id")
-base_url = env("leetify_url")
+steam_id = env("STEAM_ID")
+base_url = env("LEETIFY_URL")
 leetify_url = f"{base_url}{steam_id}"
-llm_url = env("llm_url")
-state_file = env("state_file")
-webhook_url = env("webhook_url")
+llm_url = env("LLM_URL")
+state_file = env("STATE_FILE")
+webhook_url = env("WEBHOOK_URL")
+
+if not os.path.exists("logs"):
+    os.makedirs("logs")
+
+log.basicConfig(
+    level=log.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        log.StreamHandler(),
+        log.FileHandler("logs/coach.log")
+    ]
+)
 
 
 def is_new_match(current_match_id):
@@ -33,22 +46,38 @@ def is_new_match(current_match_id):
 
 def get_latest_match():
     if not steam_id:
-        print("Error! No SteamID found in environment variables")
+        log.error("Error! No SteamID found in environment variables")
         return None
 
-    response = requests.get(leetify_url)
+    for attempt in range(3):
+        try:
+            response = requests.get(leetify_url, timeout=10)
 
-    if response.status_code == 200:
-        data = response.json()
-        latest_match = data['recent_matches'][0]
-        return latest_match
-    else:
-        print(f"Failed! Error code: {response.status_code}")
-        return None
+            if response.status_code != 200:
+                log.error(f"Failed! Error code: {response.status_code}")
+                time.sleep(2 ** attempt)
+                continue
+
+            data = response.json()
+            matches = data.get('recent_matches', [])
+
+            if not matches:
+                log.warning("No matches found in API response")
+                time.sleep(2 ** attempt)
+                continue
+
+            return matches[0]
+
+        except requests.exceptions.RequestException as e:
+            log.error(f"Request failed: {e}")
+            time.sleep(2 ** attempt)
+
+    log.error("Failed to get latest match after retries.")
+    return None
 
 
 def send_data_to_ai(latest_match):
-    print(f"Preparing data for match on {latest_match['map_name']}...")
+    log.info(f"Preparing data for match on {latest_match['map_name']}...")
     match_data = json.dumps(latest_match, indent=4)
 
     start_time = time.time()
@@ -62,34 +91,37 @@ def send_data_to_ai(latest_match):
         ]
     }
 
-    print(f"Sending request to LLM at {llm_url}...")
-    try:
-        response = requests.post(llm_url, headers=headers, data=json.dumps(payload), timeout=240)
+    log.info(f"Sending request to LLM at {llm_url}...")
+    for attempt in range(3):
+        try:
+            response = requests.post(llm_url, headers=headers, data=json.dumps(payload), timeout=240)
 
-        print(f"Received response with status code: {response.status_code}")
+            log.info(f"Received response with status code: {response.status_code}")
 
-        end_time = time.time()
-        duration = end_time - start_time
+            end_time = time.time()
+            duration = end_time - start_time
 
-        if response.status_code == 200:
-            ai_response = response.json()
-            print(f"AI responded in {duration:.2f} seconds.")
-            return ai_response['choices'][0]['message']['content']
-        else:
-            print(f"LLM Error: {response.text}")
-            return f"Coach is lagging! Code: {response.status_code}"
+            if response.status_code == 200:
+                ai_response = response.json()
+                log.info(f"AI responded in {duration:.2f} seconds.")
+                return ai_response['choices'][0]['message']['content']
+            else:
+                log.error(f"LLM Error: {response.text}")
+                time.sleep(2 ** attempt)
 
-    except requests.exceptions.Timeout:
-        print("Timeout: The LLM took too long to respond.")
-        return "Coach timed out. Is the local server running?"
-    except Exception as e:
-        print(f"Critical Error: {e}")
-        return "System failure."
+        except requests.exceptions.Timeout:
+            log.error("Timeout: The LLM took too long to respond.")
+            time.sleep(2 ** attempt)
+        except Exception as e:
+            log.error(f"Critical Error: {e}")
+            time.sleep(2 ** attempt)
+    log.error("Critical Error")
+    return "System Failure"
 
 
 def send_webhook(advice, match_time, match_result):
     if not webhook_url:
-        print("Skipping webhook: No URL found.")
+        log.error("Skipping webhook: No URL found.")
         return
 
     color = 3066993 if match_result.lower() == "win" else 15158332
@@ -103,28 +135,38 @@ def send_webhook(advice, match_time, match_result):
             "footer": {"text": "Powered by Proxmox & Llama 3.1"}
         }]
     }
+    for attempt in range(3):
+        try:
+            response = requests.post(webhook_url, json=data, timeout=10)
+            if 200 <= response.status_code < 300:
+                log.info(f"Webhook sent with status code: {response.status_code}")
+                return
+            else:
+                log.error(f"Webhook failed with status code: {response.status_code}")
+                time.sleep(2 ** attempt)
+        except requests.exceptions.Timeout:
+            log.error("Timeout: The webhook took too long to respond.")
+            time.sleep(2 ** attempt)
+        except Exception as e:
+            log.error(f"Webhook Error: {e}")
+            time.sleep(2 ** attempt)
+    log.error("All webhook retry attempts failed.")
 
-    request = requests.post(webhook_url, json=data)
-    if request.status_code == 200:
-        print(f"Webhook sent with status code: {request.status_code}")
-    else:
-        print(f"Webhook failed with status code: {request.status_code}")
 
 
 def main():
-    print("Starting Leetify AI Coach...")
+    log.info("Starting Leetify AI Coach...")
     match = get_latest_match()
     if match and is_new_match(match['id']):
         result = match['outcome']
         raw_time = match['finished_at']
         dt_obj = datetime.fromisoformat(raw_time.replace('Z', '+00:00'))
         match_time = dt_obj.strftime("%B %d, %H:%M")
-        print(f"New match found on {match['map_name']}, sending data to AI Coach...")
+        log.info(f"New match found on {match['map_name']}, sending data to AI Coach...")
         advice = send_data_to_ai(match)
-        print(advice)
         send_webhook(advice, match_time, result)
     else:
-        print("No new match found")
+        log.info("No new match found")
 
 
 if __name__ == "__main__":

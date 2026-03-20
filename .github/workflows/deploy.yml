@@ -14,6 +14,12 @@ jobs:
       - name: Log into GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
+      - name: Ensure directories and files exist
+        run: |
+          mkdir -p /home/runner/coach/logs
+          touch /home/runner/coach/state.json
+
+
       - name: Pull and Run
         env:
           STEAM_ID: ${{ secrets.STEAM_ID }}
@@ -31,4 +37,5 @@ jobs:
             -e webhook_url="$WEBHOOK_URL" \
             -e state_file="$STATE_FILE" \
             -v /home/runner/coach/state.json:/app/state.json \
+            -v /home/runner/coach/logs:/app/logs \
             ghcr.io/whitezom7/leetify-ai-coach:latest
