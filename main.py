@@ -62,11 +62,11 @@ def send_data_to_ai(latest_match):
         ]
     }
 
-    print(f"🚀 Sending request to LLM at {llm_url}...")
+    print(f"Sending request to LLM at {llm_url}...")
     try:
         response = requests.post(llm_url, headers=headers, data=json.dumps(payload), timeout=240)
 
-        print(f"📡 Received response with status code: {response.status_code}")
+        print(f"Received response with status code: {response.status_code}")
 
         end_time = time.time()
         duration = end_time - start_time
