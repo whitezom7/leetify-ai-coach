@@ -56,6 +56,9 @@ The system is designed as a decoupled, event-driven pipeline:
 
    - The container is ephemeral and destroyed after each run (--rm). However, match history is preserved via a Docker Volume Mount, ensuring the state.json persists on the Proxmox host.
 
+Example discord webhook of the AI coach feedback
+![img_1.png](img_1.png)
+
 
 ###  Environment Variables
 To run this pipeline, the following GitHub Secrets must be configured:
